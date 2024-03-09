@@ -12,27 +12,29 @@ defmodule Homework2 do
       pid
       iex> assert_receive {:pong, ^pid}
       {:pong, pid}
-
-      iex> pid = Homework2.send {:boom, self()}
-      pid
-      iex> assert_receive {:error, ^pid}
-      {:error, pid}
   """
 
   @spec send({}) :: pid()
   def send(message) do
-    pid =
-      Process.spawn(
+    receiver =
+      fn recursive_call ->
         fn ->
           receive do
-            {:ping, pid} -> send(pid, {:pong, self()})
-            {_, pid} -> send(pid, {:error, self()})
-          end
-        end,
-        [:link]
-      )
+            {:ping, pid} ->
+              send(pid, {:pong, self()})
+              recursive_call.(recursive_call)
 
-    Process.send(pid, message, [:noconnect])
+            _match_everything ->
+              IO.puts("Malformed message")
+              recursive_call.(recursive_call)
+          end
+        end
+      end
+
+    pid =
+      Process.spawn(receiver.(receiver), [:link])
+
+    Process.send(pid, message, [])
     pid
   end
 end
